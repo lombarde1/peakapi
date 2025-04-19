@@ -1,109 +1,70 @@
-const axios = require('axios');
-const Transaction = require('../models/transaction.model');
-const User = require('../models/user.model');
-const PixCredential = require('../models/pixCredential.model');
+import axios from 'axios';
+import Transaction from '../models/transaction.model.js';
+import User from '../models/user.model.js';
+import PixCredential from '../models/pixCredential.model.js';
+import { generatePixQRCode } from '../services/pix.service.js';
 
 // @desc    Gerar QR Code PIX para depósito
 // @route   POST /api/pix/generate
 // @access  Private
-exports.generatePixQrCode = async (req, res) => {
+export const generatePixQrCode = async (req, res) => {
   try {
     const { amount } = req.body;
+    const userId = req.user.id;
 
+    // Validar valor do depósito
     if (!amount || amount <= 0) {
       return res.status(400).json({
         success: false,
-        message: 'Valor inválido',
+        message: 'Valor inválido'
       });
     }
 
-    // Obter credenciais PIX ativas
-    const pixCredential = await PixCredential.findOne({ isActive: true }).select('+clientSecret');
-    
-    if (!pixCredential) {
+    // Buscar credenciais PIX ativas
+    const activeCredential = await PixCredential.findOne({ isActive: true }).select('+clientSecret');
+    if (!activeCredential) {
       return res.status(500).json({
         success: false,
-        message: 'Credenciais PIX não configuradas',
+        message: 'Credenciais PIX não configuradas'
       });
     }
 
-    // Gerar ID externo único para esta transação
-    const externalId = `PIX_${Date.now()}`;
+    // Gerar ID externo único
+    const externalId = `PIX_${Date.now()}_${userId}`;
 
-    // Criar registro de transação pendente
-    const transaction = new Transaction({
-      userId: req.user.id,
+    // Criar transação pendente
+    const transaction = await Transaction.create({
+      userId,
       type: 'DEPOSIT',
       amount: amount,
       status: 'PENDING',
-      externalReference: externalId,
       paymentMethod: 'PIX',
+      externalReference: externalId
     });
 
-    await transaction.save();
+    // Gerar QR Code PIX
+    const pixData = await generatePixQRCode({
+      amount,
+      description: 'Depósito via PIX',
+      externalId,
+      credential: activeCredential
+    });
 
-    // Preparar credenciais
-    const credentials = `${pixCredential.clientId}:${pixCredential.clientSecret}`;
-    const base64Credentials = Buffer.from(credentials).toString('base64');
-
-    // Obter token de autenticação
-    const tokenResponse = await axios.post(
-      `${pixCredential.baseUrl}/oauth/token`,
-      'grant_type=client_credentials',
-      {
-        headers: {
-          'Authorization': `Basic ${base64Credentials}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      }
-    );
-
-    const token = tokenResponse.data.access_token;
-
-    // Obter usuário para informações do pagador
-    const user = await User.findById(req.user.id);
-
-    // Criar solicitação de QR Code PIX
-    const pixRequest = {
-      amount: parseFloat(amount),
-      postbackUrl: pixCredential.webhookUrl,
-      payer: {
-        name: user.fullName || user.username,
-        document: user.cpf || '00000000000',
-        email: user.email,
-      },
-    };
-
-    // Enviar solicitação para gerar QR Code
-    const pixResponse = await axios.post(
-      `${pixCredential.baseUrl}/pix/qrcode`,
-      pixRequest,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      }
-    );
-
-    res.json({
+    res.status(201).json({
       success: true,
-      message: 'QR Code PIX gerado com sucesso',
-      transaction_id: transaction._id,
-      external_id: externalId,
-      qr_code: pixResponse.data.qrcode,
-      qr_code_image: pixResponse.data.qrcodeImage || null,
-      expiration: pixResponse.data.expiration || null,
-      amount: amount,
+      data: {
+        transaction_id: transaction._id,
+        external_id: externalId,
+        qr_code: pixData.qrCode,
+        amount: amount
+      }
     });
   } catch (error) {
-    console.error(`Erro ao gerar QR Code PIX: ${error.message}`);
-    const errorData = error.response ? error.response.data : null;
-    
+    console.error('Erro ao gerar QR Code PIX:', error.response ? error.response.data : error.message);
     res.status(500).json({
       success: false,
       message: 'Erro ao gerar QR Code PIX',
-      error: errorData || error.message,
+      error: error.response ? error.response.data : error.message
     });
   }
 };
@@ -111,16 +72,17 @@ exports.generatePixQrCode = async (req, res) => {
 // @desc    Webhook para notificações de pagamento PIX
 // @route   POST /api/pix/webhook
 // @access  Public
-exports.pixWebhook = async (req, res) => {
+export const pixWebhook = async (req, res) => {
   try {
     const { requestBody } = req.body;
 
-    console.log('Webhook PIX recebido:', JSON.stringify(requestBody));
+    console.log('PIX RECEBIDO');
+    console.log('Webhook data:', JSON.stringify(requestBody));
 
     if (!requestBody || requestBody.status !== 'PAID') {
       return res.status(400).json({
         success: false,
-        message: 'Dados de webhook inválidos',
+        message: 'Dados de webhook inválidos'
       });
     }
 
@@ -128,14 +90,14 @@ exports.pixWebhook = async (req, res) => {
     const latestTransaction = await Transaction.findOne({
       type: 'DEPOSIT',
       status: 'PENDING',
-      paymentMethod: 'PIX',
+      paymentMethod: 'PIX'
     }).sort({ createdAt: -1 });
 
     if (!latestTransaction) {
       console.log('Nenhuma transação PIX pendente encontrada');
       return res.status(404).json({
         success: false,
-        message: 'Nenhuma transação PIX pendente encontrada',
+        message: 'Nenhuma transação PIX pendente encontrada'
       });
     }
 
@@ -148,9 +110,9 @@ exports.pixWebhook = async (req, res) => {
       dateApproval: requestBody.dateApproval || new Date(),
       payerInfo: requestBody.creditParty || {},
       webhookData: requestBody,
+      bonus: 0  // Adicione este campo para satisfazer a validação
     };
 
-    // Salvar a transação para acionar o middleware que atualiza o saldo
     await latestTransaction.save();
 
     // Verificar se o saldo foi atualizado (para debug)
@@ -159,14 +121,13 @@ exports.pixWebhook = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Pagamento processado com sucesso',
+      message: 'Pagamento processado com sucesso'
     });
   } catch (error) {
-    console.error(`Erro ao processar webhook PIX: ${error.message}`);
+    console.error('Erro ao processar webhook PIX:', error);
     res.status(500).json({
       success: false,
-      message: 'Erro ao processar notificação de pagamento',
-      error: error.message,
+      message: 'Erro ao processar notificação de pagamento'
     });
   }
 };
@@ -174,44 +135,42 @@ exports.pixWebhook = async (req, res) => {
 // @desc    Verificar status do pagamento PIX
 // @route   GET /api/pix/status/:external_id
 // @access  Private
-exports.checkPixStatus = async (req, res) => {
+export const checkPixStatus = async (req, res) => {
   try {
     const { external_id } = req.params;
+    const userId = req.user.id;
 
-    // Encontrar a transação pelo ID externo
-    const transaction = await Transaction.findOne({ externalReference: external_id });
+    // Buscar transação
+    const transaction = await Transaction.findOne({
+      externalReference: external_id
+    });
 
     if (!transaction) {
       return res.status(404).json({
         success: false,
-        message: 'Transação não encontrada',
+        message: 'Transação não encontrada'
       });
     }
 
-    // Verificar se o usuário tem permissão para ver esta transação
-    if (transaction.userId.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Não autorizado a visualizar esta transação',
-      });
-    }
+
 
     res.json({
       success: true,
-      status: transaction.status,
-      transaction_id: transaction._id,
-      external_id: transaction.externalReference,
-      amount: transaction.amount,
-      created_at: transaction.createdAt,
-      updated_at: transaction.updatedAt,
-      metadata: transaction.metadata,
+      data: {
+        status: transaction.status,
+        transaction_id: transaction._id,
+        external_id: transaction.externalReference,
+        amount: transaction.amount,
+        created_at: transaction.createdAt,
+        updated_at: transaction.updatedAt,
+        metadata: transaction.metadata
+      }
     });
   } catch (error) {
-    console.error(`Erro ao verificar status do pagamento PIX: ${error.message}`);
+    console.error('Erro ao verificar status PIX:', error);
     res.status(500).json({
       success: false,
-      message: 'Erro ao verificar status do pagamento',
-      error: error.message,
+      message: 'Erro ao verificar status do pagamento'
     });
   }
 };

@@ -1,66 +1,55 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
-const gameSchema = new mongoose.Schema(
-  {
-    name: {
-      type: String,
-      required: [true, 'Nome do jogo é obrigatório'],
-      trim: true,
-    },
-    provider: {
-      type: String,
-      required: [true, 'Provedor do jogo é obrigatório'],
-      trim: true,
-    },
-    category: {
-      type: String,
-      enum: ['slots', 'table', 'live', 'crash', 'sport', 'other'],
-      default: 'slots',
-    },
-    imageUrl: {
-      type: String,
-    },
-    description: {
-      type: String,
-    },
-    minBet: {
-      type: Number,
-      default: 1,
-    },
-    maxBet: {
-      type: Number,
-      default: 1000,
-    },
-    rtp: {
-      type: Number,
-      min: 0,
-      max: 100,
-    },
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
-    isFeatured: {
-      type: Boolean,
-      default: false,
-    },
-    popularity: {
-      type: Number,
-      default: 0,
-    },
-    gameConfig: {
-      type: Object,
-      default: {},
-    },
+const gameSchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: true,
+    trim: true
   },
-  {
-    timestamps: true,
+  description: {
+    type: String,
+    required: true
+  },
+  category: {
+    type: String,
+    required: true,
+    enum: ['SPORTS', 'CASINO', 'LOTTERY', 'OTHER']
+  },
+  status: {
+    type: String,
+    enum: ['ACTIVE', 'INACTIVE', 'MAINTENANCE'],
+    default: 'ACTIVE'
+  },
+  odds: {
+    type: Number,
+    required: true,
+    min: 1
+  },
+  startTime: {
+    type: Date,
+    required: true
+  },
+  endTime: {
+    type: Date,
+    required: true
+  },
+  result: {
+    type: String,
+    default: null
+  },
+  metadata: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
   }
-);
+}, {
+  timestamps: true
+});
 
-// Índice para pesquisa por nome do jogo
-gameSchema.index({ name: 'text', provider: 'text' });
+// Índices para melhorar performance
+gameSchema.index({ category: 1, status: 1 });
+gameSchema.index({ startTime: 1, endTime: 1 });
+gameSchema.index({ status: 1 });
 
 const Game = mongoose.model('Game', gameSchema);
 
-module.exports = Game; 
+export default Game; 

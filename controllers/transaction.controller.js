@@ -1,10 +1,10 @@
-const Transaction = require('../models/transaction.model');
-const User = require('../models/user.model');
+import Transaction from '../models/transaction.model.js';
+import User from '../models/user.model.js';
 
 // @desc    Obter todas as transações do usuário
 // @route   GET /api/transactions
 // @access  Private
-exports.getTransactions = async (req, res) => {
+export const getTransactions = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -40,14 +40,13 @@ exports.getTransactions = async (req, res) => {
       total,
       pages: Math.ceil(total / limit),
       currentPage: page,
-      transactions,
+      data: transactions
     });
   } catch (error) {
-    console.error(`Erro ao obter transações: ${error.message}`);
+    console.error('Erro ao obter transações:', error);
     res.status(500).json({
       success: false,
-      message: 'Erro ao obter transações',
-      error: error.message,
+      message: 'Erro ao obter transações'
     });
   }
 };
@@ -55,7 +54,7 @@ exports.getTransactions = async (req, res) => {
 // @desc    Obter todas as transações (admin)
 // @route   GET /api/transactions/all
 // @access  Private/Admin
-exports.getAllTransactions = async (req, res) => {
+export const getAllTransactions = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -112,35 +111,29 @@ exports.getAllTransactions = async (req, res) => {
 // @desc    Obter uma transação por ID
 // @route   GET /api/transactions/:id
 // @access  Private
-exports.getTransactionById = async (req, res) => {
+export const getTransactionById = async (req, res) => {
   try {
-    const transaction = await Transaction.findById(req.params.id);
+    const transaction = await Transaction.findOne({
+      _id: req.params.id,
+      userId: req.user.id
+    });
 
     if (!transaction) {
       return res.status(404).json({
         success: false,
-        message: 'Transação não encontrada',
-      });
-    }
-
-    // Verificar se o usuário é dono da transação ou é admin
-    if (transaction.userId.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Acesso negado',
+        message: 'Transação não encontrada'
       });
     }
 
     res.json({
       success: true,
-      transaction,
+      data: transaction
     });
   } catch (error) {
-    console.error(`Erro ao obter transação: ${error.message}`);
+    console.error('Erro ao obter transação:', error);
     res.status(500).json({
       success: false,
-      message: 'Erro ao obter transação',
-      error: error.message,
+      message: 'Erro ao obter transação'
     });
   }
 };
@@ -148,7 +141,7 @@ exports.getTransactionById = async (req, res) => {
 // @desc    Iniciar retirada
 // @route   POST /api/transactions/withdraw
 // @access  Private
-exports.createWithdrawal = async (req, res) => {
+export const createWithdrawal = async (req, res) => {
   try {
     const { amount, paymentMethod, pixKey, pixKeyType } = req.body;
 
@@ -227,7 +220,7 @@ exports.createWithdrawal = async (req, res) => {
 // @desc    Atualizar status da transação (admin)
 // @route   PUT /api/transactions/:id
 // @access  Private/Admin
-exports.updateTransactionStatus = async (req, res) => {
+export const updateTransactionStatus = async (req, res) => {
   try {
     const { status } = req.body;
 
@@ -278,6 +271,50 @@ exports.updateTransactionStatus = async (req, res) => {
       success: false,
       message: 'Erro ao atualizar status da transação',
       error: error.message,
+    });
+  }
+};
+
+// @desc    Cancelar transação
+// @route   POST /api/transactions/:id/cancel
+// @access  Private
+export const cancelTransaction = async (req, res) => {
+  try {
+    const transaction = await Transaction.findOne({
+      _id: req.params.id,
+      userId: req.user.id,
+      status: 'PENDING'
+    });
+
+    if (!transaction) {
+      return res.status(404).json({
+        success: false,
+        message: 'Transação não encontrada ou não pode ser cancelada'
+      });
+    }
+
+    // Atualizar status da transação
+    transaction.status = 'CANCELLED';
+    transaction.cancelledAt = new Date();
+    await transaction.save();
+
+    // Se for uma aposta, reembolsar o valor
+    if (transaction.type === 'BET') {
+      const user = await User.findById(req.user.id);
+      user.balance += transaction.amount;
+      await user.save();
+    }
+
+    res.json({
+      success: true,
+      message: 'Transação cancelada com sucesso',
+      data: transaction
+    });
+  } catch (error) {
+    console.error('Erro ao cancelar transação:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao cancelar transação'
     });
   }
 }; 

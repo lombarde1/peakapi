@@ -1,9 +1,9 @@
-const Game = require('../models/game.model');
+import Game from '../models/game.model.js';
 
 // @desc    Obter todos os jogos
 // @route   GET /api/games
 // @access  Public
-exports.getGames = async (req, res) => {
+export const getGames = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -62,7 +62,7 @@ exports.getGames = async (req, res) => {
 // @desc    Obter jogos em destaque
 // @route   GET /api/games/featured
 // @access  Public
-exports.getFeaturedGames = async (req, res) => {
+export const getFeaturedGames = async (req, res) => {
   try {
     const games = await Game.find({ isActive: true, isFeatured: true })
       .sort({ popularity: -1 })
@@ -86,7 +86,7 @@ exports.getFeaturedGames = async (req, res) => {
 // @desc    Obter um jogo por ID
 // @route   GET /api/games/:id
 // @access  Public
-exports.getGameById = async (req, res) => {
+export const getGameById = async (req, res) => {
   try {
     const game = await Game.findById(req.params.id);
 
@@ -114,7 +114,7 @@ exports.getGameById = async (req, res) => {
 // @desc    Criar um novo jogo
 // @route   POST /api/games
 // @access  Private/Admin
-exports.createGame = async (req, res) => {
+export const createGame = async (req, res) => {
   try {
     const {
       name,
@@ -181,7 +181,7 @@ exports.createGame = async (req, res) => {
 // @desc    Atualizar um jogo
 // @route   PUT /api/games/:id
 // @access  Private/Admin
-exports.updateGame = async (req, res) => {
+export const updateGame = async (req, res) => {
   try {
     const {
       name,
@@ -241,7 +241,7 @@ exports.updateGame = async (req, res) => {
 // @desc    Excluir um jogo
 // @route   DELETE /api/games/:id
 // @access  Private/Admin
-exports.deleteGame = async (req, res) => {
+export const deleteGame = async (req, res) => {
   try {
     const game = await Game.findById(req.params.id);
 

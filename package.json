@@ -1,6 +1,7 @@
 {
   "name": "peakbet-api",
   "version": "1.0.0",
+  "type": "module",
   "description": "API para casa de apostas PeakBet",
   "main": "app.js",
   "scripts": {

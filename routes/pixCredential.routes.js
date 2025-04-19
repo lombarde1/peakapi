@@ -1,13 +1,14 @@
-const express = require('express');
-const router = express.Router();
-const { 
+import express from 'express';
+import { 
   getPixCredentials, 
   getPixCredentialById, 
   createPixCredential, 
   updatePixCredential, 
   deletePixCredential 
-} = require('../controllers/pixCredential.controller');
-const { verifyToken, isAdmin } = require('../middleware/auth');
+} from '../controllers/pixCredential.controller.js';
+import { verifyToken, isAdmin } from '../middleware/auth.js';
+
+const router = express.Router();
 
 // Todas as rotas de credenciais PIX requerem autenticação e permissões de admin
 router.use(verifyToken, isAdmin);
@@ -19,4 +20,4 @@ router.post('/', createPixCredential);
 router.put('/:id', updatePixCredential);
 router.delete('/:id', deletePixCredential);
 
-module.exports = router; 
+export default router; 

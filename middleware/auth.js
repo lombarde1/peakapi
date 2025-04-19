@@ -1,87 +1,74 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/user.model');
+import jwt from 'jsonwebtoken';
+import User from '../models/user.model.js';
 
 // Middleware para verificar token JWT
-exports.verifyToken = async (req, res, next) => {
+export const verifyToken = async (req, res, next) => {
   try {
-    let token;
-
-    // Verificar se o token está presente no header Authorization
-    if (
-      req.headers.authorization &&
-      req.headers.authorization.startsWith('Bearer')
-    ) {
-      token = req.headers.authorization.split(' ')[1];
-    }
-
-    // Verificar se o token existe
-    if (!token) {
+    // Pegar token do header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         success: false,
-        message: 'Acesso não autorizado. Token não fornecido.',
+        message: 'Token não fornecido'
       });
     }
 
-    // Verificar se o token é válido
+    const token = authHeader.split(' ')[1];
+
+    // Verificar token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Obter o usuário pelo ID decodificado do token
+    // Buscar usuário no banco
     const user = await User.findById(decoded.id);
-
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'Usuário não encontrado',
+        message: 'Usuário não encontrado'
       });
     }
 
-    // Verificar se o usuário está ativo
-    if (user.status !== 'active') {
+    // Verificar se usuário está ativo
+    if (user.status !== 'ACTIVE') {
       return res.status(401).json({
         success: false,
-        message: 'Conta de usuário suspensa ou inativa',
+        message: 'Conta suspensa ou inativa'
       });
     }
 
-    // Adicionar o usuário à requisição
+    // Adicionar usuário decodificado à requisição
     req.user = {
       id: user._id,
       username: user.username,
       email: user.email,
-      role: user.role,
+      role: user.role
     };
 
     next();
   } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Token inválido',
-      });
-    }
-
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Token expirado',
-      });
-    }
-
-    return res.status(500).json({
+    console.error('Erro na autenticação:', error);
+    res.status(401).json({
       success: false,
-      message: 'Erro ao autenticar usuário',
+      message: 'Token inválido ou expirado'
     });
   }
 };
 
 // Middleware para verificar permissões de admin
-exports.isAdmin = (req, res, next) => {
-  if (req.user && req.user.role === 'admin') {
+export const isAdmin = async (req, res, next) => {
+  try {
+    if (req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Acesso negado. Apenas administradores.'
+      });
+    }
+
     next();
-  } else {
-    return res.status(403).json({
+  } catch (error) {
+    console.error('Erro na verificação de admin:', error);
+    res.status(500).json({
       success: false,
-      message: 'Acesso negado. Apenas administradores podem acessar esta rota.',
+      message: 'Erro ao verificar permissões'
     });
   }
 }; 

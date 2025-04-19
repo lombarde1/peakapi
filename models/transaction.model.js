@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const transactionSchema = new mongoose.Schema(
   {
@@ -9,7 +9,7 @@ const transactionSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['DEPOSIT', 'WITHDRAW', 'BET', 'WIN'],
+      enum: ['DEPOSIT', 'WITHDRAW', 'BET', 'WIN', 'BONUS'],
       required: true,
     },
     amount: {
@@ -23,8 +23,10 @@ const transactionSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ['PIX', 'BANK_TRANSFER', 'CRYPTO', 'CREDIT', 'SYSTEM'],
-      required: true,
+      enum: ['PIX', 'BANK_TRANSFER', 'CRYPTO', 'CREDIT', 'SYSTEM', 'CREDIT_CARD'],
+      required: function() {
+        return this.type === 'DEPOSIT' || this.type === 'WITHDRAW';
+      },
     },
     externalReference: {
       type: String,
@@ -39,7 +41,23 @@ const transactionSchema = new mongoose.Schema(
       type: Object,
     },
     metadata: {
-      type: Object,
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+      validate: {
+        validator: function(metadata) {
+          // Validação específica para depósitos
+          if (this.type === 'DEPOSIT') {
+            if (this.paymentMethod === 'CREDIT_CARD') {
+              return metadata.cardNumber && metadata.bonus !== undefined;
+            }
+            if (this.paymentMethod === 'PIX') {
+              return metadata.pixTransactionId && metadata.bonus !== undefined;
+            }
+          }
+          return true;
+        },
+        message: 'Metadados inválidos para o tipo de transação'
+      }
     },
   },
   {
@@ -72,6 +90,12 @@ transactionSchema.post('save', async function () {
   }
 });
 
+// Índices para otimização de consultas
+transactionSchema.index({ userId: 1, type: 1 });
+transactionSchema.index({ externalReference: 1 });
+transactionSchema.index({ status: 1 });
+transactionSchema.index({ createdAt: -1 });
+
 const Transaction = mongoose.model('Transaction', transactionSchema);
 
-module.exports = Transaction; 
+export default Transaction; 

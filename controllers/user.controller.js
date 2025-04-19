@@ -1,9 +1,9 @@
-const User = require('../models/user.model');
+import User from '../models/user.model.js';
 
 // @desc    Obter todos os usuários
 // @route   GET /api/users
 // @access  Private/Admin
-exports.getUsers = async (req, res) => {
+export const getUsers = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -54,10 +54,10 @@ exports.getUsers = async (req, res) => {
   }
 };
 
-// @desc    Obter um usuário por ID
+// @desc    Obter usuário por ID
 // @route   GET /api/users/:id
 // @access  Private/Admin
-exports.getUserById = async (req, res) => {
+export const getUserById = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select('-password');
 
@@ -85,7 +85,7 @@ exports.getUserById = async (req, res) => {
 // @desc    Atualizar usuário
 // @route   PUT /api/users/:id
 // @access  Private/Admin
-exports.updateUser = async (req, res) => {
+export const updateUser = async (req, res) => {
   try {
     const { fullName, email, phone, cpf, status, role, balance } = req.body;
 
@@ -160,10 +160,10 @@ exports.updateUser = async (req, res) => {
   }
 };
 
-// @desc    Excluir usuário
+// @desc    Deletar usuário
 // @route   DELETE /api/users/:id
 // @access  Private/Admin
-exports.deleteUser = async (req, res) => {
+export const deleteUser = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
 

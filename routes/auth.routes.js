@@ -1,7 +1,8 @@
-const express = require('express');
+import express from 'express';
+import { register, login, getProfile } from '../controllers/auth.controller.js';
+import { verifyToken } from '../middleware/auth.js';
+
 const router = express.Router();
-const { register, login, getProfile } = require('../controllers/auth.controller');
-const { verifyToken } = require('../middleware/auth');
 
 // Rotas públicas
 router.post('/register', register);
@@ -10,4 +11,4 @@ router.post('/login', login);
 // Rotas privadas (requer autenticação)
 router.get('/profile', verifyToken, getProfile);
 
-module.exports = router; 
+export default router; 

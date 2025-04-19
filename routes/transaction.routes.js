@@ -1,13 +1,14 @@
-const express = require('express');
-const router = express.Router();
-const { 
+import express from 'express';
+import { 
   getTransactions, 
   getAllTransactions, 
   getTransactionById, 
   createWithdrawal,
   updateTransactionStatus 
-} = require('../controllers/transaction.controller');
-const { verifyToken, isAdmin } = require('../middleware/auth');
+} from '../controllers/transaction.controller.js';
+import { verifyToken, isAdmin } from '../middleware/auth.js';
+
+const router = express.Router();
 
 // Rotas para usuários autenticados
 router.get('/', verifyToken, getTransactions);
@@ -18,4 +19,4 @@ router.post('/withdraw', verifyToken, createWithdrawal);
 router.get('/admin/all', verifyToken, isAdmin, getAllTransactions);
 router.put('/:id', verifyToken, isAdmin, updateTransactionStatus);
 
-module.exports = router; 
+export default router; 

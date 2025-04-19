@@ -1,5 +1,5 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/user.model');
+import jwt from 'jsonwebtoken';
+import User from '../models/user.model.js';
 
 // Gerar Token JWT
 const generateToken = (id) => {
@@ -11,12 +11,12 @@ const generateToken = (id) => {
 // @desc    Registrar novo usuário
 // @route   POST /api/auth/register
 // @access  Public
-exports.register = async (req, res) => {
+export const register = async (req, res) => {
   try {
     const { username, email, password, fullName, phone, cpf } = req.body;
 
     // Verificar se os campos obrigatórios foram fornecidos
-    if (!username || !email || !password || !fullName) {
+    if (!username || !email || !password || !fullName || !cpf) {
       return res.status(400).json({
         success: false,
         message: 'Por favor, preencha todos os campos obrigatórios',
@@ -35,15 +35,13 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Verificar se o CPF já existe (se fornecido)
-    if (cpf) {
-      const cpfExists = await User.findOne({ cpf });
-      if (cpfExists) {
-        return res.status(400).json({
-          success: false,
-          message: 'CPF já cadastrado',
-        });
-      }
+    // Verificar se o CPF já existe
+    const cpfExists = await User.findOne({ cpf });
+    if (cpfExists) {
+      return res.status(400).json({
+        success: false,
+        message: 'CPF já cadastrado',
+      });
     }
 
     // Criar novo usuário
@@ -51,60 +49,53 @@ exports.register = async (req, res) => {
       username,
       email,
       password,
-      fullName,
+      name: fullName,
       phone,
       cpf,
+      role: 'USER',
+      status: 'ACTIVE'
     });
 
-    if (user) {
-      res.status(201).json({
-        success: true,
-        message: 'Usuário registrado com sucesso',
-        user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          fullName: user.fullName,
-          role: user.role,
-        },
-        token: generateToken(user._id),
-      });
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: 'Dados de usuário inválidos',
-      });
-    }
+    // Gerar token
+    const token = generateToken(user._id);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        token,
+      },
+    });
   } catch (error) {
-    console.error(`Erro ao registrar usuário: ${error.message}`);
+    console.error('Erro no registro:', error);
     res.status(500).json({
       success: false,
       message: 'Erro ao registrar usuário',
-      error: error.message,
     });
   }
 };
 
-// @desc    Autenticar usuário e obter token
+// @desc    Login de usuário
 // @route   POST /api/auth/login
 // @access  Public
-exports.login = async (req, res) => {
+export const login = async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    // Verificar se o username e a senha foram fornecidos
+    // Verificar se os campos foram fornecidos
     if (!username || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Por favor, forneça nome de usuário e senha',
+        message: 'Por favor, forneça username e senha',
       });
     }
 
-    // Verificar se o usuário existe
-    const user = await User.findOne({
-      $or: [{ username }, { email: username }],
-    }).select('+password');
-
+    // Buscar usuário
+    const user = await User.findOne({ username });
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -112,46 +103,46 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Verificar se a senha está correta
-    const isPasswordMatch = await user.matchPassword(password);
-
-    if (!isPasswordMatch) {
+    // Verificar senha
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
       return res.status(401).json({
         success: false,
         message: 'Credenciais inválidas',
       });
     }
 
-    // Verificar se o usuário está ativo
-    if (user.status !== 'active') {
+    // Verificar se usuário está ativo
+    if (user.status !== 'ACTIVE') {
       return res.status(401).json({
         success: false,
         message: 'Conta suspensa ou inativa',
       });
     }
 
-    // Atualizar data do último login
-    user.lastLogin = Date.now();
+    // Atualizar último login
+    user.lastLogin = new Date();
     await user.save();
+
+    // Gerar token
+    const token = generateToken(user._id);
 
     res.json({
       success: true,
-      user: {
+      data: {
         id: user._id,
         username: user.username,
         email: user.email,
-        fullName: user.fullName,
+        name: user.name,
         role: user.role,
-        balance: user.balance,
+        token,
       },
-      token: generateToken(user._id),
     });
   } catch (error) {
-    console.error(`Erro ao autenticar usuário: ${error.message}`);
+    console.error('Erro no login:', error);
     res.status(500).json({
       success: false,
-      message: 'Erro ao autenticar usuário',
-      error: error.message,
+      message: 'Erro ao fazer login',
     });
   }
 };
@@ -159,38 +150,25 @@ exports.login = async (req, res) => {
 // @desc    Obter perfil do usuário
 // @route   GET /api/auth/profile
 // @access  Private
-exports.getProfile = async (req, res) => {
+export const getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
-
-    if (user) {
-      res.json({
-        success: true,
-        user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          fullName: user.fullName,
-          phone: user.phone,
-          cpf: user.cpf,
-          balance: user.balance,
-          role: user.role,
-          status: user.status,
-          createdAt: user.createdAt,
-        },
-      });
-    } else {
-      res.status(404).json({
+    const user = await User.findById(req.user.id).select('-password');
+    if (!user) {
+      return res.status(404).json({
         success: false,
         message: 'Usuário não encontrado',
       });
     }
+
+    res.json({
+      success: true,
+      data: user,
+    });
   } catch (error) {
-    console.error(`Erro ao obter perfil de usuário: ${error.message}`);
+    console.error('Erro ao buscar perfil:', error);
     res.status(500).json({
       success: false,
-      message: 'Erro ao obter perfil de usuário',
-      error: error.message,
+      message: 'Erro ao buscar perfil',
     });
   }
 }; 

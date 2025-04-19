@@ -1,14 +1,15 @@
-const express = require('express');
-const router = express.Router();
-const { 
+import express from 'express';
+import { 
   getGames, 
   getFeaturedGames,
   getGameById, 
   createGame, 
   updateGame, 
   deleteGame 
-} = require('../controllers/game.controller');
-const { verifyToken, isAdmin } = require('../middleware/auth');
+} from '../controllers/game.controller.js';
+import { verifyToken, isAdmin } from '../middleware/auth.js';
+
+const router = express.Router();
 
 // Rotas públicas
 router.get('/', getGames);
@@ -20,4 +21,4 @@ router.post('/', verifyToken, isAdmin, createGame);
 router.put('/:id', verifyToken, isAdmin, updateGame);
 router.delete('/:id', verifyToken, isAdmin, deleteGame);
 
-module.exports = router; 
+export default router; 

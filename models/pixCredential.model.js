@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const pixCredentialSchema = new mongoose.Schema(
   {
@@ -48,4 +48,4 @@ const pixCredentialSchema = new mongoose.Schema(
 
 const PixCredential = mongoose.model('PixCredential', pixCredentialSchema);
 
-module.exports = PixCredential; 
+export default PixCredential; 
