@@ -9,7 +9,7 @@ const transactionSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['DEPOSIT', 'WITHDRAWL', 'BET', 'WIN', 'BONUS',],
+      enum: ['DEPOSIT', 'WITHDRAWAL', 'BET', 'WIN', 'BONUS',],
       required: true,
     },
     amount: {
@@ -25,7 +25,7 @@ const transactionSchema = new mongoose.Schema(
       type: String,
       enum: ['PIX', 'BANK_TRANSFER', 'CRYPTO', 'CREDIT', 'SYSTEM', 'CREDIT_CARD'],
       required: function() {
-        return this.type === 'DEPOSIT' || this.type === 'WITHDRAWL';
+        return this.type === 'DEPOSIT' || this.type === 'WITHDRAWAL';
       },
     },
     externalReference: {
@@ -78,7 +78,7 @@ transactionSchema.post('save', async function () {
 
     if (this.type === 'DEPOSIT' || this.type === 'WIN') {
       user.balance += this.amount;
-    } else if ((this.type === 'WITHDRAWL' || this.type === 'BET') && user.balance >= this.amount) {
+    } else if ((this.type === 'WITHDRAWAL' || this.type === 'BET') && user.balance >= this.amount) {
       user.balance -= this.amount;
     } else {
       console.error(`Saldo insuficiente para a transação: ${this._id}`);
