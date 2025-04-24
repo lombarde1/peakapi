@@ -111,6 +111,7 @@ export const getAllTransactions = async (req, res) => {
 // @desc    Obter uma transação por ID
 // @route   GET /api/transactions/:id
 // @access  Private
+
 export const getTransactionById = async (req, res) => {
   try {
     const transaction = await Transaction.findOne({
